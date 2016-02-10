@@ -80,7 +80,7 @@ func MatchAttribute(key, namespace, value string) Matcher {
 	}
 }
 
-type matchAttribute Attribute
+type matchAttribute html.Attribute
 
 func (m *matchAttribute) Match(n *Node) bool {
 	attr := n.Attribute(m.Key, m.Namespace)

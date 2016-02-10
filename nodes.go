@@ -1,6 +1,10 @@
 package hck
 
-import "golang.org/x/net/html"
+import (
+	"io"
+
+	"golang.org/x/net/html"
+)
 
 type loopError struct{}
 
@@ -59,8 +63,8 @@ func (ns Nodes) Splice(i, del int, n ...*Node) Nodes {
 	return dest
 }
 
-func (n *Nodes) Render(w Writer) error {
-	doc = &html.Node{
+func (n *Nodes) Render(w io.Writer) error {
+	doc := &html.Node{
 		Type: html.DocumentNode,
 	}
 	first, last := n.convert(doc)
@@ -180,16 +184,16 @@ func (s *nodeSeq) contains(n *Node) bool {
 	return s.next.contains(n)
 }
 
-func (n *Node) Render(w Writer) error {
+func (n *Node) Render(w io.Writer) error {
 	doc, err := n.Convert()
 	if err != nil {
 		return err
 	}
 	if n.Type != html.DocumentNode {
 		tmp := &html.Node{
-			Type: html.DocumentNode,
+			Type:       html.DocumentNode,
 			FirstChild: doc,
-			LastChild: doc,
+			LastChild:  doc,
 		}
 		doc.Parent = tmp
 		doc = tmp
