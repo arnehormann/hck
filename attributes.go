@@ -1,4 +1,4 @@
-package hkc
+package hck
 
 import (
 	"strings"

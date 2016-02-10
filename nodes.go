@@ -1,4 +1,4 @@
-package hkc
+package hck
 
 import "golang.org/x/net/html"
 
@@ -79,7 +79,7 @@ type Node struct {
 	Type html.NodeType
 }
 
-// Convert a /x/net/html.Node to a hkc.Node.
+// Convert a /x/net/html.Node to a Node.
 func Convert(h *html.Node) *Node {
 	var children Nodes
 	for c := h.FirstChild; c != nil; c = c.NextSibling {

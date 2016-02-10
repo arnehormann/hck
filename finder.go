@@ -1,4 +1,4 @@
-package hkc
+package hck
 
 func (n *Node) Find(ms ...Matcher) *Finder {
 	var f *Finder

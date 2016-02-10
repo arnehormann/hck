@@ -1,4 +1,4 @@
-package hkc
+package hck
 
 func (n *Node) Cursor() *Cursor {
 	return &Cursor{path: []*Node{n}}
