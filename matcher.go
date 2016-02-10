@@ -39,6 +39,21 @@ func (ms matchAll) Match(n *Node) bool {
 	return true
 }
 
+func MatchAny(ms ...Match) Matcher {
+	return matchAny(ms)
+}
+
+type matchAny []Match
+
+func (ms matchAny) Match(n *Node) bool {
+	for _, m := range ms {
+		if m(n) {
+			return true
+		}
+	}
+	return false
+}
+
 func MatchTag(tag, namespace string) Matcher {
 	_, tag = atomize(tag)
 	return &matchTag{
