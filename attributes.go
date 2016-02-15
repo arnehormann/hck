@@ -20,6 +20,12 @@ func atomize(s string) (atom.Atom, string) {
 	return 0, s
 }
 
+func (as Attributes) atomize() {
+	for i := range as {
+		_, as[i].Key = atomize(as[i].Key)
+	}
+}
+
 type Attributes []html.Attribute
 
 func (as Attributes) Len() int {
@@ -32,15 +38,11 @@ func (as Attributes) Swap(i, j int) {
 
 func (as Attributes) Less(i, j int) bool {
 	ai, aj := &as[i], &as[j]
-	return ai.Namespace < aj.Namespace || ai.Namespace == aj.Namespace &&
-		ai.Key < aj.Key || ai.Key == aj.Key &&
-		ai.Val < aj.Val
-}
-
-func (as Attributes) atomize() {
-	for i := range as {
-		_, as[i].Key = atomize(as[i].Key)
-	}
+	return ai.Namespace < aj.Namespace ||
+		ai.Namespace == aj.Namespace &&
+			ai.Key < aj.Key ||
+		ai.Key == aj.Key &&
+			ai.Val < aj.Val
 }
 
 func (as Attributes) index(key, namespace string) int {
@@ -72,31 +74,34 @@ func (as *Attributes) findOrAdd(key, namespace string) *html.Attribute {
 	return &attrs[len(attrs)-1]
 }
 
-func (as Attributes) ID() string {
-	if id := as.find(attrID, ""); id != nil {
-		return id.Val
+func (as Attributes) Get(key, namespace string) string {
+	if i := as.index(key, namespace); i >= 0 {
+		return as[i].Val
 	}
 	return ""
 }
 
-func (as *Attributes) SetID(val string) (was string) {
-	id := as.findOrAdd(attrID, "")
-	id.Val, was = val, id.Val
+func (as *Attributes) Set(key, namespace, value string) (was string) {
+	a := as.findOrAdd(key, namespace)
+	a.Val, was = value, a.Val
 	return was
+}
+
+func (as Attributes) ID() string {
+	return as.Get(attrID, "")
+}
+
+func (as *Attributes) SetID(val string) (was string) {
+	return as.Set(attrID, "", val)
 }
 
 // Class retrieves the value of the "class" attribute
 func (as Attributes) Class() string {
-	if class := as.find(attrClass, ""); class != nil {
-		return class.Val
-	}
-	return ""
+	return as.Get(attrClass, "")
 }
 
 func (as *Attributes) SetClass(val string) (was string) {
-	class := as.findOrAdd(attrClass, "")
-	class.Val, was = val, class.Val
-	return was
+	return as.Set(attrClass, "", val)
 }
 
 // Classes splits the value of the class attribute into the individual classes.

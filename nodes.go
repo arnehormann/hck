@@ -12,18 +12,9 @@ func (e loopError) Error() string {
 	return "graph contains loops"
 }
 
-// Nodes is a sortable node slice
-type Nodes []*Node
-
-func (ns Nodes) Len() int {
-	return len(ns)
-}
-
-func (ns Nodes) Swap(i, j int) {
-	ns[i], ns[j] = ns[j], ns[i]
-}
-
-func (ns Nodes) Index(m Matcher) int {
+// index retrieves the index of the first matching node.
+// It returns -1 if no match is found.
+func index(ns []*Node, m Matcher) int {
 	for i := range ns {
 		if m.Match(ns[i]) {
 			return i
@@ -32,11 +23,33 @@ func (ns Nodes) Index(m Matcher) int {
 	return -1
 }
 
+// splice copies ns, modifies it and retrieves the copy.
+// Starting at i, del nodes are replaced with n.
+func splice(ns []*Node, i, del int, n ...*Node) []*Node {
+	if del < 0 {
+		return nil
+	}
+	dest := make([]*Node, len(ns)+len(n)-del)
+	si := i
+	di := copy(dest[:si], ns[:si])
+	di += del - copy(dest[di:], n)
+	di += copy(dest[di:], ns[si:])
+	return dest
+}
+
+type Siblings []*Node
+
+// Index retrieves the index of the first matching node.
+// It returns -1 if no match is found.
+func (s Siblings) Index(m Matcher) int {
+	return index([]*Node(s), m)
+}
+
 // Convert Nodes to /x/net/html.Node siblings.
-func (ns Nodes) convert(parent *html.Node) (first, last *html.Node) {
+func (s Siblings) convert(parent *html.Node) (first, last *html.Node) {
 	var prev *html.Node
-	for _, c := range ns {
-		h := c.convert()
+	for _, sib := range s {
+		h := sib.convert()
 		h.Parent = parent
 		h.PrevSibling = prev
 		if prev != nil {
@@ -49,25 +62,11 @@ func (ns Nodes) convert(parent *html.Node) (first, last *html.Node) {
 	return first, prev
 }
 
-// Splice retrieves a modified copy.
-// Starting at i, del nodes are replaced with n.
-func (ns Nodes) Splice(i, del int, n ...*Node) Nodes {
-	if del < 0 {
-		return nil
-	}
-	dest := make([]*Node, len(ns)+len(n)-del)
-	si := i
-	di := copy(dest[:si], ns[:si])
-	di += del - copy(dest[di:], n)
-	di += copy(dest[di:], ns[si:])
-	return dest
-}
-
-func (n *Nodes) Render(w io.Writer) error {
+func (s Siblings) Render(w io.Writer) error {
 	doc := &html.Node{
 		Type: html.DocumentNode,
 	}
-	first, last := n.convert(doc)
+	first, last := s.convert(doc)
 	doc.FirstChild = first
 	doc.LastChild = last
 	return html.Render(w, doc)
@@ -76,27 +75,48 @@ func (n *Nodes) Render(w io.Writer) error {
 // Node is an alternative to golang.org/x/net/html.Node intended for dom mutation.
 // It stores a minimal amount of references that have to be updated on transformations.
 type Node struct {
-	Children  Nodes
+	Children  Siblings
 	Namespace string
 	Data      string
-	*Attributes
+	Attributes
 	Type html.NodeType
 }
 
 // Convert a /x/net/html.Node to a Node.
 func Convert(h *html.Node) *Node {
-	var children Nodes
+	var children Siblings
 	for c := h.FirstChild; c != nil; c = c.NextSibling {
 		children = append(children, Convert(c))
 	}
-	attrs := Attributes(h.Attr)
 	return &Node{
 		Children:   children,
 		Namespace:  h.Namespace,
 		Data:       h.Data,
-		Attributes: &attrs,
+		Attributes: Attributes(h.Attr),
 		Type:       h.Type,
 	}
+}
+
+// Node clones the node.
+func (n *Node) Node() *Node {
+	if n == nil {
+		return n
+	}
+	return &Node{
+		Children:   append(Siblings{}, n.Children...),
+		Namespace:  n.Namespace,
+		Data:       n.Data,
+		Attributes: append(Attributes{}, n.Attributes...),
+		Type:       n.Type,
+	}
+}
+
+func (n *Node) Swap(n2 *Node) {
+	n.Children, n2.Children = n2.Children, n.Children
+	n.Namespace, n2.Namespace = n2.Namespace, n.Namespace
+	n.Data, n2.Data = n2.Data, n.Data
+	n.Attributes, n2.Attributes = n2.Attributes, n.Attributes
+	n.Type, n2.Type = n2.Type, n.Type
 }
 
 func (n *Node) convert() *html.Node {
@@ -108,7 +128,7 @@ func (n *Node) convert() *html.Node {
 	// normalize strings
 	h.DataAtom, h.Data = atomize(n.Data)
 	n.Attributes.atomize()
-	h.Attr = []html.Attribute(*n.Attributes)
+	h.Attr = []html.Attribute(n.Attributes)
 	// add children
 	h.FirstChild, h.LastChild = n.Children.convert(h)
 	return h
@@ -124,16 +144,43 @@ func (n *Node) Convert() (*html.Node, error) {
 }
 
 func (n *Node) Attribute(key, namespace string) *html.Attribute {
+	if n == nil {
+		return nil
+	}
 	return n.Attributes.find(key, namespace)
 }
 
-func (n *Node) PutAttribute(key, namespace, value string) {
-	attr := n.Attributes.findOrAdd(key, namespace)
-	attr.Val = value
+func (n *Node) Attrs() *Attributes {
+	return &n.Attributes
+}
+
+func (n *Node) GetAttr(key, namespace string) string {
+	return n.Attributes.Get(key, namespace)
+}
+
+func (n *Node) SetAttr(key, namespace, value string) (was string) {
+	return n.Attrs().Set(key, namespace, value)
 }
 
 func (n *Node) Match(m *Node) bool {
 	return n == m
+}
+
+func (n *Node) Render(w io.Writer) error {
+	doc, err := n.Convert()
+	if err != nil {
+		return err
+	}
+	if n.Type != html.DocumentNode {
+		tmp := &html.Node{
+			Type:       html.DocumentNode,
+			FirstChild: doc,
+			LastChild:  doc,
+		}
+		doc.Parent = tmp
+		doc = tmp
+	}
+	return html.Render(w, doc)
 }
 
 // Loopfree reports whether no node is the ancestor of its own parents.
@@ -182,21 +229,4 @@ func (s *nodeSeq) contains(n *Node) bool {
 		}
 	}
 	return s.next.contains(n)
-}
-
-func (n *Node) Render(w io.Writer) error {
-	doc, err := n.Convert()
-	if err != nil {
-		return err
-	}
-	if n.Type != html.DocumentNode {
-		tmp := &html.Node{
-			Type:       html.DocumentNode,
-			FirstChild: doc,
-			LastChild:  doc,
-		}
-		doc.Parent = tmp
-		doc = tmp
-	}
-	return html.Render(w, doc)
 }

@@ -1,7 +1,51 @@
 package hck
 
 func (n *Node) Cursor() *Cursor {
-	return &Cursor{path: []*Node{n}}
+	if n == nil {
+		return nil
+	}
+	return Path{n}.Cursor()
+}
+
+// Path contains all nodes traversed to get to its last node.
+type Path []*Node
+
+// Index retrieves the index of the first matching node.
+// It returns -1 if no match is found.
+func (p Path) Index(m Matcher) int {
+	return index([]*Node(p), m)
+}
+
+// Node retrieves the last node.
+// If the path is empty, it returns nil.
+func (p Path) Node() *Node {
+	for i := len(p) - 1; i >= 0; i-- {
+		if n := p[i]; n != nil {
+			return n
+		}
+	}
+	return nil
+}
+
+func (p Path) Cursor() *Cursor {
+	if len(p) == 0 {
+		return nil
+	}
+	idx := -1
+	if pi := len(p) - 2; pi >= 0 {
+		idx = p[pi].Children.Index(p[pi+1])
+	}
+	return &Cursor{
+		path: p,
+		idx:  idx,
+	}
+}
+
+func (p Path) Prev() Path {
+	if len(p) == 0 {
+		return p[:0]
+	}
+	return p[:len(p)-1]
 }
 
 // Cursor points to a node and stores the path to it.
@@ -9,7 +53,8 @@ func (n *Node) Cursor() *Cursor {
 //
 // You must not modify the path to a cursor and the sibling nodes.
 type Cursor struct {
-	path Nodes
+	path Path
+
 	// index of current node in its parent's children
 	idx int
 }
@@ -17,14 +62,21 @@ type Cursor struct {
 // Cursor creates a new cursor pointing to the same node.
 func (c *Cursor) Cursor() *Cursor {
 	return &Cursor{
-		path: append(Nodes{}, c.path...),
+		path: append(Path{}, c.path...),
 		idx:  c.idx,
 	}
 }
 
 // Depth retrieves the number of ancestor nodes.
 func (c *Cursor) Depth() int {
-	return len(c.path) - 1
+	if d := len(c.path) - 1; d > 0 {
+		return d
+	}
+	return 0
+}
+
+func (c *Cursor) appendPath(dest Path) Path {
+	return append(dest, c.path...)
 }
 
 // Node retrieves the current node.
