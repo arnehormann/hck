@@ -154,11 +154,19 @@ func (n *Node) Attrs() *Attributes {
 	return &n.Attributes
 }
 
-func (n *Node) GetAttr(key, namespace string) string {
+func (n *Node) Attr(key string) string {
+	return n.Attributes.Get(key, "")
+}
+
+func (n *Node) AttrNS(key, namespace string) string {
 	return n.Attributes.Get(key, namespace)
 }
 
-func (n *Node) SetAttr(key, namespace, value string) (was string) {
+func (n *Node) SetAttr(key, value string) (was string) {
+	return n.Attrs().Set(key, "", value)
+}
+
+func (n *Node) SetAttrNS(key, namespace, value string) (was string) {
 	return n.Attrs().Set(key, namespace, value)
 }
 

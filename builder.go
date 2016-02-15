@@ -13,15 +13,15 @@ type Builder interface {
 	Build() *Node
 }
 
-func (n *Node) Rebuild() Builder {
-	return builder{path: Path{n}}
-}
-
 type builder struct {
 	path Path
 }
 
 var _ Builder = builder{}
+
+func Build(n *Node) Builder {
+	return builder{path: Path{n}}
+}
 
 func Tag(tag string) Builder {
 	return TagNS(tag, "")
