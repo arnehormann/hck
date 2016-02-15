@@ -97,8 +97,8 @@ func Convert(h *html.Node) *Node {
 	}
 }
 
-// Node clones the node.
-func (n *Node) Node() *Node {
+// Clone retrieves a copy of the node.
+func (n *Node) Clone() *Node {
 	if n == nil {
 		return n
 	}

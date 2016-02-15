@@ -13,6 +13,10 @@ type Builder interface {
 	Build() *Node
 }
 
+func (n *Node) Rebuild() Builder {
+	return builder{path: Path{n}}
+}
+
 type builder struct {
 	path Path
 }
