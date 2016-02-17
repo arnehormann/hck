@@ -73,14 +73,17 @@ func (s Siblings) Render(w io.Writer) error {
 }
 
 func (s Siblings) SplitAfter(m Matcher) (Siblings, Siblings) {
-	i := s.Index(n) + 1
+	i := s.Index(m) + 1
+	if i <= 0 {
+		i = len(s)
+	}
 	return s[:i:i], s[i:]
 }
 
 func (s Siblings) SplitBefore(m Matcher) (Siblings, Siblings) {
-	i := s.Index(n)
+	i := s.Index(m)
 	if i < 0 {
-		return nil, s
+		i = len(s)
 	}
 	return s[:i:i], s[i:]
 }
