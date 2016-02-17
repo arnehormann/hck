@@ -12,16 +12,7 @@ func (m Match) Match(n *Node) bool {
 	return m(n)
 }
 
-type matchNone struct{}
-
-func (_ matchNone) Match(*Node) bool {
-	return false
-}
-
 func NewMatcher(ms ...Match) Matcher {
-	if len(ms) == 0 {
-		return matchNone{}
-	}
 	if len(ms) == 1 {
 		return ms[0]
 	}
@@ -54,20 +45,31 @@ func (ms matchAny) Match(n *Node) bool {
 	return false
 }
 
-func MatchTag(tag, namespace string) Matcher {
+func MatchTag(tag string) Matcher {
 	_, tag = atomize(tag)
-	return &matchTag{
+	return matchTag(tag)
+}
+
+type matchTag string
+
+func (m matchTag) Match(n *Node) bool {
+	return n.Type == html.ElementNode && n.Data == string(m)
+}
+
+func MatchTagNS(tag, namespace string) Matcher {
+	_, tag = atomize(tag)
+	return &matchTagNS{
 		data:      tag,
 		namespace: namespace,
 	}
 }
 
-type matchTag struct {
+type matchTagNS struct {
 	data      string
 	namespace string
 }
 
-func (m *matchTag) Match(n *Node) bool {
+func (m *matchTagNS) Match(n *Node) bool {
 	return n.Type == html.ElementNode && n.Namespace == m.namespace && n.Data == m.data
 }
 

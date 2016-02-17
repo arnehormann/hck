@@ -6,12 +6,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-type loopError struct{}
-
-func (e loopError) Error() string {
-	return "graph contains loops"
-}
-
 // index retrieves the index of the first matching node.
 // It returns -1 if no match is found.
 func index(ns []*Node, m Matcher) int {
@@ -45,10 +39,14 @@ func (s Siblings) Index(m Matcher) int {
 	return index([]*Node(s), m)
 }
 
-// Convert Nodes to /x/net/html.Node siblings.
+// convert nodes to /x/net/html.Node siblings.
+// Nils are skipped.
 func (s Siblings) convert(parent *html.Node) (first, last *html.Node) {
 	var prev *html.Node
 	for _, sib := range s {
+		if sib == nil {
+			continue
+		}
 		h := sib.convert()
 		h.Parent = parent
 		h.PrevSibling = prev
@@ -62,6 +60,8 @@ func (s Siblings) convert(parent *html.Node) (first, last *html.Node) {
 	return first, prev
 }
 
+// Render nodes to a writer.
+// nil nodes are skipped.
 func (s Siblings) Render(w io.Writer) error {
 	doc := &html.Node{
 		Type: html.DocumentNode,
@@ -72,6 +72,11 @@ func (s Siblings) Render(w io.Writer) error {
 	return html.Render(w, doc)
 }
 
+func (s Siblings) SplitAfter(n *Node) (Siblings, Siblings) {
+	i := s.Index(n) + 1
+	return s[:i:i], s[i:]
+}
+
 // Node is an alternative to golang.org/x/net/html.Node intended for dom mutation.
 // It stores a minimal amount of references that have to be updated on transformations.
 type Node struct {
@@ -80,6 +85,15 @@ type Node struct {
 	Data      string
 	Attributes
 	Type html.NodeType
+}
+
+// Parse a tree from r.
+func Parse(r io.Reader) (*Node, error) {
+	dom, err := html.Parse(r)
+	if err != nil {
+		return nil, err
+	}
+	return Convert(dom), nil
 }
 
 // Convert a /x/net/html.Node to a Node.
@@ -111,15 +125,21 @@ func (n *Node) Clone() *Node {
 	}
 }
 
-func (n *Node) Swap(n2 *Node) {
+// Swap state with another node and retrieve that node.
+func (n *Node) Swap(n2 *Node) *Node {
 	n.Children, n2.Children = n2.Children, n.Children
 	n.Namespace, n2.Namespace = n2.Namespace, n.Namespace
 	n.Data, n2.Data = n2.Data, n.Data
 	n.Attributes, n2.Attributes = n2.Attributes, n.Attributes
 	n.Type, n2.Type = n2.Type, n.Type
+	return n2
 }
 
+// convert a Node to a /x/net/html.Node.
 func (n *Node) convert() *html.Node {
+	if n == nil {
+		return nil
+	}
 	h := &html.Node{
 		Namespace: n.Namespace,
 		Data:      n.Data,
@@ -135,14 +155,16 @@ func (n *Node) convert() *html.Node {
 }
 
 // Convert a Node to a /x/net/html.Node.
-// If a node is an ancestor of its own parent, an error will be returned.
+// If a child node is an ancestor of its own parent, an error will be returned.
 func (n *Node) Convert() (*html.Node, error) {
-	if !n.Loopfree() {
+	if n.HasCycle() {
 		return nil, loopError{}
 	}
 	return n.convert(), nil
 }
 
+// Attribute retrieves a pointer to the Attribute with the given key and namespace.
+// If none exists, nil is returned.
 func (n *Node) Attribute(key, namespace string) *html.Attribute {
 	if n == nil {
 		return nil
@@ -150,24 +172,22 @@ func (n *Node) Attribute(key, namespace string) *html.Attribute {
 	return n.Attributes.find(key, namespace)
 }
 
-func (n *Node) Attrs() *Attributes {
-	return &n.Attributes
-}
-
+// Attr retrieves the value of an attribute.
 func (n *Node) Attr(key string) string {
 	return n.Attributes.Get(key, "")
 }
 
+// Attr retrieves the value of an attribute with a namespace.
 func (n *Node) AttrNS(key, namespace string) string {
 	return n.Attributes.Get(key, namespace)
 }
 
 func (n *Node) SetAttr(key, value string) (was string) {
-	return n.Attrs().Set(key, "", value)
+	return n.Attributes.Set(key, "", value)
 }
 
 func (n *Node) SetAttrNS(key, namespace, value string) (was string) {
-	return n.Attrs().Set(key, namespace, value)
+	return n.Attributes.Set(key, namespace, value)
 }
 
 func (n *Node) Match(m *Node) bool {
@@ -191,50 +211,41 @@ func (n *Node) Render(w io.Writer) error {
 	return html.Render(w, doc)
 }
 
-// Loopfree reports whether no node is the ancestor of its own parents.
-func (n *Node) Loopfree() bool {
-	return n.loopfree(nil, make(map[*Node]*nodeSeq))
+// HasCycle reports whether any reachable node is the ancestor of its own parents.
+func (n *Node) HasCycle() bool {
+	return n.hasCycle(nil, make(map[*Node][]*Node))
 }
 
-func (n *Node) loopfree(parent *Node, parents map[*Node]*nodeSeq) bool {
+func (n *Node) hasCycle(parent *Node, parents map[*Node][]*Node) bool {
 	if n == nil {
-		return true
+		return false
 	}
 	known := parents[n]
-	if known != nil && known.contains(parent) {
-		// n was checked already and exists under a different parent.
-		// we have a loop when one parent is reachable from another parent.
-		return false
-	}
-	parents[n] = &nodeSeq{
-		next: known,
-		node: parent,
-	}
-	for _, c := range n.Children {
-		if !c.loopfree(n, parents) {
-			return false
+	parents[n] = append(known, parent)
+	check := []*Node{n}
+	for next := check; len(next) > 0; {
+		for _, c := range check {
+			if c == nil {
+				continue
+			}
+			for _, k := range known {
+				if k == nil {
+					continue
+				}
+				if k == n {
+					return true
+				}
+			}
+			next = append(next, c.Children...)
 		}
+		check = append(check[:0:0], next...)
+		next = next[:0]
 	}
-	return true
+	return false
 }
 
-// nodeSeq is a single linked list of nodes
-type nodeSeq struct {
-	next *nodeSeq
-	node *Node
-}
+type loopError struct{}
 
-func (s *nodeSeq) contains(n *Node) bool {
-	if s == nil {
-		return false
-	}
-	if s.node == n {
-		return true
-	}
-	for _, c := range n.Children {
-		if s.contains(c) {
-			return true
-		}
-	}
-	return s.next.contains(n)
+func (e loopError) Error() string {
+	return "graph contains loops"
 }

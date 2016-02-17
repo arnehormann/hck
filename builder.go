@@ -112,9 +112,8 @@ func (b builder) Leave() Builder {
 }
 
 func (b builder) Build() *Node {
-	n := b.path.Node()
-	if n == nil {
-		panic("illegal builder")
+	if n := b.path[0]; n != nil {
+		return n
 	}
-	return n
+	panic("illegal builder")
 }

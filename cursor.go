@@ -79,6 +79,10 @@ func (c *Cursor) appendPath(dest Path) Path {
 	return append(dest, c.path...)
 }
 
+func (c *Cursor) Path() Path {
+	return append(Path{}, c.path...)
+}
+
 // Node retrieves the current node.
 func (c *Cursor) Node() *Node {
 	return c.path[c.Depth()]
