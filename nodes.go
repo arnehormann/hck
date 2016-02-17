@@ -72,8 +72,16 @@ func (s Siblings) Render(w io.Writer) error {
 	return html.Render(w, doc)
 }
 
-func (s Siblings) SplitAfter(n *Node) (Siblings, Siblings) {
+func (s Siblings) SplitAfter(m Matcher) (Siblings, Siblings) {
 	i := s.Index(n) + 1
+	return s[:i:i], s[i:]
+}
+
+func (s Siblings) SplitBefore(m Matcher) (Siblings, Siblings) {
+	i := s.Index(n)
+	if i < 0 {
+		return nil, s
+	}
 	return s[:i:i], s[i:]
 }
 
