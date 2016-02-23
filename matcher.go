@@ -100,3 +100,13 @@ func MatchChild(m Matcher) Matcher {
 func (m matchChild) Match(n *Node) bool {
 	return n.Children.Index(m.m) >= 0
 }
+
+func MatchType(t html.NodeType) Matcher {
+	return matchType(t)
+}
+
+type matchType html.NodeType
+
+func (m matchType) Match(n *Node) bool {
+	return n.Type == html.NodeType(m)
+}

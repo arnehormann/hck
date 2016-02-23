@@ -127,6 +127,14 @@ func Classes(val string) []string {
 	return strs
 }
 
+func (as *Attributes) Delete(a *html.Attribute) {
+	s := *as
+	if i := s.index(a.Key, a.Namespace); i >= 0 {
+		copy(s[i:], s[i+1:])
+		*as = s[:len(s)-1]
+	}
+}
+
 func (as *Attributes) AddClass(class string) {
 	attr := as.findOrAdd(attrClass, "")
 	val := " " + class + " "

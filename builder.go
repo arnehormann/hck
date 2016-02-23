@@ -23,11 +23,11 @@ func Build(n *Node) Builder {
 	return builder{path: Path{n}}
 }
 
-func Document(children...*hck.Node) Builder {
-	return Build(&hck.Node{
-		Type: html.DocumentNode,
+func Document(children ...*Node) *Node {
+	return &Node{
+		Type:     html.DocumentNode,
 		Children: Siblings(children),
-	})
+	}
 }
 
 func Tag(tag string) Builder {
