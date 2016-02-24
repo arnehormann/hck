@@ -43,11 +43,11 @@ func (s Siblings) Index(m Matcher) int {
 // Nils are skipped.
 func (s Siblings) convert(parent *html.Node) (first, last *html.Node) {
 	var prev *html.Node
-	for _, sib := range s {
-		if sib == nil {
+	for _, n := range s {
+		if n == nil {
 			continue
 		}
-		h := sib.convert()
+		h := n.convert()
 		h.Parent = parent
 		h.PrevSibling = prev
 		if prev != nil {

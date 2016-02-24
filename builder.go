@@ -3,12 +3,12 @@ package hck
 import "golang.org/x/net/html"
 
 type Builder interface {
+	Namespace(namespace string) Builder
 	Attr(key, value string) Builder
 	AttrNS(key, namespace, value string) Builder
 	AddText(text string) Builder
 	AddChildren(children ...*Node) Builder
 	AddChild(tag string) Builder
-	AddChildNS(tag, namespace string) Builder
 	Leave() Builder
 	Build() *Node
 }
@@ -30,20 +30,27 @@ func Document(children ...*Node) *Node {
 	}
 }
 
-func Tag(tag string) Builder {
-	return TagNS(tag, "")
+func Text(t string) *Node {
+	return &Node{
+		Type: html.TextNode,
+		Data: t,
+	}
 }
 
-func TagNS(tag, namespace string) Builder {
+func Tag(tag string) Builder {
 	return builder{
 		path: Path{
 			&Node{
-				Type:      html.ElementNode,
-				Data:      tag,
-				Namespace: namespace,
+				Type: html.ElementNode,
+				Data: tag,
 			},
 		},
 	}
+}
+
+func (b builder) Namespace(ns string) Builder {
+	b.path.Node().Namespace = ns
+	return b
 }
 
 func (b builder) node() *Node {
@@ -72,10 +79,7 @@ func (b builder) AddText(text string) Builder {
 		panic("illegal builder")
 	}
 	n := b.path.Node()
-	n.Children = append(n.Children, &Node{
-		Type: html.TextNode,
-		Data: text,
-	})
+	n.Children = append(n.Children, Text(text))
 	return b
 }
 
@@ -89,18 +93,10 @@ func (b builder) AddChildren(children ...*Node) Builder {
 }
 
 func (b builder) AddChild(tag string) Builder {
-	return b.AddChildNS(tag, "")
-}
-
-func (b builder) AddChildNS(tag, namespace string) Builder {
 	if len(b.path) == 0 {
 		panic("illegal builder")
 	}
-	c := &Node{
-		Namespace: namespace,
-		Data:      tag,
-		Type:      html.ElementNode,
-	}
+	c := Tag(tag).Build()
 	n := b.path.Node()
 	n.Children = append(n.Children, c)
 	return builder{
