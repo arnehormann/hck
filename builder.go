@@ -3,14 +3,32 @@ package hck
 import "golang.org/x/net/html"
 
 type Builder interface {
+	// set namespace on current tag
 	Namespace(namespace string) Builder
+
+	// add attribute
 	Attr(key, value string) Builder
+
+	// add attribute with namespace
 	AttrNS(key, namespace, value string) Builder
-	AddText(text string) Builder
-	AddChildren(children ...*Node) Builder
-	AddChild(tag string) Builder
+
+	// add tag as child, return builder inside child
+	Tag(tag string) Builder
+
+	// add textnode as child
+	Text(text string) Builder
+
+	// add multiple child nodes
+	Children(children ...*Node) Builder
+
+	// leave a child, return builder inside parent
 	Leave() Builder
-	Build() *Node
+
+	// retrieve the current node
+	Node() *Node
+
+	// retrieve the root node
+	Root() *Node
 }
 
 type builder struct {
@@ -49,12 +67,8 @@ func Tag(tag string) Builder {
 }
 
 func (b builder) Namespace(ns string) Builder {
-	b.path.Node().Namespace = ns
+	b.Node().Namespace = ns
 	return b
-}
-
-func (b builder) node() *Node {
-	return b.path.Node()
 }
 
 func (b builder) Attr(key, value string) Builder {
@@ -65,7 +79,7 @@ func (b builder) AttrNS(key, namespace, value string) Builder {
 	if len(b.path) == 0 {
 		panic("illegal builder")
 	}
-	n := b.path.Node()
+	n := b.Node()
 	n.Attributes = append(n.Attributes, html.Attribute{
 		Namespace: namespace,
 		Key:       key,
@@ -74,34 +88,34 @@ func (b builder) AttrNS(key, namespace, value string) Builder {
 	return b
 }
 
-func (b builder) AddText(text string) Builder {
+func (b builder) Text(text string) Builder {
 	if len(b.path) == 0 {
 		panic("illegal builder")
 	}
-	n := b.path.Node()
+	n := b.Node()
 	n.Children = append(n.Children, Text(text))
 	return b
 }
 
-func (b builder) AddChildren(children ...*Node) Builder {
+func (b builder) Tag(tag string) Builder {
 	if len(b.path) == 0 {
 		panic("illegal builder")
 	}
-	n := b.path.Node()
-	n.Children = append(n.Children, children...)
-	return b
-}
-
-func (b builder) AddChild(tag string) Builder {
-	if len(b.path) == 0 {
-		panic("illegal builder")
-	}
-	c := Tag(tag).Build()
-	n := b.path.Node()
+	c := Tag(tag).Node()
+	n := b.Node()
 	n.Children = append(n.Children, c)
 	return builder{
 		path: append(b.path, c),
 	}
+}
+
+func (b builder) Children(children ...*Node) Builder {
+	if len(b.path) == 0 {
+		panic("illegal builder")
+	}
+	n := b.Node()
+	n.Children = append(n.Children, children...)
+	return b
 }
 
 func (b builder) Leave() Builder {
@@ -114,7 +128,11 @@ func (b builder) Leave() Builder {
 	}
 }
 
-func (b builder) Build() *Node {
+func (b builder) Node() *Node {
+	return b.path.Node()
+}
+
+func (b builder) Root() *Node {
 	if n := b.path[0]; n != nil {
 		return n
 	}
