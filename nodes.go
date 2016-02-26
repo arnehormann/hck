@@ -9,8 +9,8 @@ import (
 // index retrieves the index of the first matching node.
 // It returns -1 if no match is found.
 func index(ns []*Node, m Matcher) int {
-	for i := range ns {
-		if m.Match(ns[i]) {
+	for i, n := range ns {
+		if m.Match(n) {
 			return i
 		}
 	}

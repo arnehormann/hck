@@ -21,7 +21,7 @@ type Builder interface {
 	// add multiple child nodes
 	Children(children ...*Node) Builder
 
-	// leave a child, return builder inside parent
+	// return builder inside parent
 	Leave() Builder
 
 	// retrieve the current node

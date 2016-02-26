@@ -12,33 +12,38 @@ func (m Match) Match(n *Node) bool {
 	return m(n)
 }
 
-func NewMatcher(ms ...Match) Matcher {
-	if len(ms) == 1 {
-		return ms[0]
+func Matchers(ms ...Match) []Matcher {
+	mm := make([]Matcher, len(ms))
+	for i, m := range ms {
+		mm[i] = m
 	}
+	return mm
+}
+
+func MatchAll(ms ...Matcher) Matcher {
 	return matchAll(ms)
 }
 
-type matchAll []Match
+type matchAll []Matcher
 
 func (ms matchAll) Match(n *Node) bool {
 	for _, m := range ms {
-		if !m(n) {
+		if !m.Match(n) {
 			return false
 		}
 	}
 	return true
 }
 
-func MatchAny(ms ...Match) Matcher {
+func MatchAny(ms ...Matcher) Matcher {
 	return matchAny(ms)
 }
 
-type matchAny []Match
+type matchAny []Matcher
 
 func (ms matchAny) Match(n *Node) bool {
 	for _, m := range ms {
-		if m(n) {
+		if m.Match(n) {
 			return true
 		}
 	}
@@ -53,7 +58,9 @@ func MatchTag(tag string) Matcher {
 type matchTag string
 
 func (m matchTag) Match(n *Node) bool {
-	return n.Type == html.ElementNode && n.Data == string(m)
+	return n != nil &&
+		n.Type == html.ElementNode &&
+		n.Data == string(m)
 }
 
 func MatchTagNS(tag, namespace string) Matcher {
@@ -70,7 +77,10 @@ type matchTagNS struct {
 }
 
 func (m *matchTagNS) Match(n *Node) bool {
-	return n.Type == html.ElementNode && n.Namespace == m.namespace && n.Data == m.data
+	return n != nil &&
+		n.Type == html.ElementNode &&
+		n.Namespace == m.namespace &&
+		n.Data == m.data
 }
 
 func MatchAttribute(key, namespace, value string) Matcher {
@@ -86,7 +96,8 @@ type matchAttribute html.Attribute
 
 func (m *matchAttribute) Match(n *Node) bool {
 	attr := n.Attribute(m.Key, m.Namespace)
-	return attr != nil && attr.Val == m.Val
+	return attr != nil &&
+		attr.Val == m.Val
 }
 
 type matchChild struct {
@@ -98,7 +109,8 @@ func MatchChild(m Matcher) Matcher {
 }
 
 func (m matchChild) Match(n *Node) bool {
-	return n.Children.Index(m.m) >= 0
+	return n != nil &&
+		n.Children.Index(m.m) >= 0
 }
 
 func MatchType(t html.NodeType) Matcher {
@@ -108,5 +120,19 @@ func MatchType(t html.NodeType) Matcher {
 type matchType html.NodeType
 
 func (m matchType) Match(n *Node) bool {
-	return n.Type == html.NodeType(m)
+	return n != nil &&
+		n.Type == html.NodeType(m)
+}
+
+func MatchNamespace(namespace string) Matcher {
+	return matchNamespace{namespace}
+}
+
+type matchNamespace struct {
+	namespace string
+}
+
+func (m matchNamespace) Match(n *Node) bool {
+	return n != nil &&
+		n.Namespace == m.namespace
 }
