@@ -39,12 +39,29 @@ func (s Siblings) Index(m Matcher) int {
 	return index([]*Node(s), m)
 }
 
+// Splice copies the siblings and modifies it by deleting del nodes starting at i
+// and inserting ns there.
+func (s Siblings) Splice(i, del int, ns ...*Node) Siblings {
+	return splice([]*Node(s), i, del, ns...)
+}
+
 // convert nodes to /x/net/html.Node siblings.
+// Document node children are integrated as siblings.
 // Nils are skipped.
 func (s Siblings) convert(parent *html.Node) (first, last *html.Node) {
 	var prev *html.Node
 	for _, n := range s {
 		if n == nil {
+			continue
+		}
+		if n.Type == html.DocumentNode {
+			start, end := n.Children.convert(parent)
+			if prev != nil {
+				prev.NextSibling = start
+			} else {
+				first = start
+			}
+			prev = end
 			continue
 		}
 		h := n.convert()
@@ -72,19 +89,15 @@ func (s Siblings) Render(w io.Writer) error {
 	return html.Render(w, doc)
 }
 
-func (s Siblings) SplitAfter(m Matcher) (Siblings, Siblings) {
-	i := s.Index(m) + 1
-	if i <= 0 {
-		i = len(s)
+// SplitBefore retrieves siblings up to and starting with the first node from which a match is reachable.
+// If no match is found, back is empty.
+func (s Siblings) SplitBefore(m Matcher) (front, back Siblings) {
+	f := Document(s...).Find(m)
+	if f.Next() == nil {
+		return s, nil
 	}
-	return s[:i:i], s[i:]
-}
-
-func (s Siblings) SplitBefore(m Matcher) (Siblings, Siblings) {
-	i := s.Index(m)
-	if i < 0 {
-		i = len(s)
-	}
+	p := f.Path()
+	i := s.Index(p[1])
 	return s[:i:i], s[i:]
 }
 

@@ -12,13 +12,22 @@ func (n *Node) Find(ms ...Matcher) *Finder {
 	return &Finder{fs}
 }
 
+func (r *Node) PathTo(n *Node) Path {
+	f := Document(r).Find(n)
+	f.next()
+	p := f.Path()
+	if len(p) == 0 {
+		return p
+	}
+	return p[1:]
+}
+
 func (n *Node) Each(m Matcher, f func(n *Node)) {
 	fnd := n.Find(m)
-	for {
-		n := fnd.Next()
-		if n == nil {
-			return
-		}
+	n2 := fnd.Next()
+	for n2 != nil {
+		n := n2
+		n2 = fnd.Next()
 		f(n)
 	}
 }
@@ -42,9 +51,8 @@ nextInner:
 	}
 	// search match
 	f0 := fs[0]
-	var n *Node
 	for {
-		n = f0.Next()
+		n := f0.Next()
 		if n == nil {
 			f0.Cursor = nil
 			return nil
@@ -89,6 +97,17 @@ type Finder struct {
 	finders
 }
 
+func (f Finder) Find(m Matcher) *Finder {
+	return &Finder{
+		finders: append(
+			f.finders[:len(f.finders):len(f.finders)],
+			finder{
+				Matcher: m,
+			},
+		),
+	}
+}
+
 func (f Finder) Next() *Node {
 	fs := f.next()
 	if fs == nil {
@@ -106,4 +125,13 @@ func (f *Finder) Each(do func(Path) (stop bool)) {
 		path = f.appendPath(path[:0])
 		stop = do(path)
 	}
+}
+
+// All retrieves all remaining findable nodes.
+func (f *Finder) All() []*Node {
+	var ns []*Node
+	for n := f.Next(); n != nil; n = f.Next() {
+		ns = append(ns, n)
+	}
+	return ns
 }

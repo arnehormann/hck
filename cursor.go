@@ -80,12 +80,32 @@ func (c *Cursor) appendPath(dest Path) Path {
 }
 
 func (c *Cursor) Path() Path {
-	return append(Path{}, c.path...)
+	return c.appendPath(nil)
 }
 
 // Node retrieves the current node.
 func (c *Cursor) Node() *Node {
 	return c.path[c.Depth()]
+}
+
+func (c *Cursor) Swap(n *Node) (prev *Node, ok bool) {
+	cn := c.Node()
+	if cn == nil {
+		return nil, false
+	}
+	return cn.Swap(n), true
+}
+
+func (c *Cursor) Seek(m Matcher) bool {
+	for {
+		n := c.Next()
+		if n == nil {
+			return false
+		}
+		if m.Match(n) {
+			return true
+		}
+	}
 }
 
 // PrevSibling moves to and retrieves the previous sibling node.
